@@ -95,9 +95,11 @@ export default function App() {
           )}
 
           {activeTab === 'learning-loop' && (
-            <LearningLoopDashboard 
-              key={`learning-loop-${refreshTrigger}`}
-            />
+            <div className="max-w-7xl mx-auto py-2">
+              <LearningLoopDashboard 
+                key={`learning-loop-${refreshTrigger}`}
+              />
+            </div>
           )}
 
           {activeTab === 'ward-explorer' && (

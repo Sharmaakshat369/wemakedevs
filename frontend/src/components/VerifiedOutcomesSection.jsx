@@ -31,8 +31,31 @@ export default function VerifiedOutcomesSection({ outcomes = [], wards = [], onO
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [selectedDomain, setSelectedDomain] = useState('ALL'); // 'ALL', 'heat', 'waterlogging', 'water_shortage'
+  const [selectedWard, setSelectedWard] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const heatCount = outcomes.filter(o => o.hazard_type === 'heat').length;
+  const waterloggingCount = outcomes.filter(o => o.hazard_type === 'waterlogging').length;
+  const waterShortageCount = outcomes.filter(o => o.hazard_type === 'water_shortage').length;
+
   const realCount = outcomes.filter(o => o.provenance === 'REAL').length;
   const simCount = outcomes.filter(o => o.provenance === 'SIMULATED').length;
+
+  // Multi-Hazard filtering
+  const filteredOutcomes = outcomes.filter(o => {
+    if (selectedDomain !== 'ALL' && o.hazard_type !== selectedDomain) return false;
+    if (selectedWard !== 'ALL' && o.ward_id !== selectedWard && o.ward_name !== selectedWard) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchId = (o.outcome_id || '').toLowerCase().includes(q);
+      const matchWard = (o.ward_id || '').toLowerCase().includes(q) || (o.ward_name || '').toLowerCase().includes(q);
+      const matchSource = (o.data_source || '').toLowerCase().includes(q);
+      const matchNotes = (o.verification_notes || '').toLowerCase().includes(q);
+      if (!matchId && !matchWard && !matchSource && !matchNotes) return false;
+    }
+    return true;
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -92,6 +115,82 @@ export default function VerifiedOutcomesSection({ outcomes = [], wards = [], onO
         </div>
       </div>
 
+      {/* Multi-Hazard Domain Filters & Search Toolbar */}
+      <div className="flex justify-between items-center flex-wrap gap-3 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
+        {/* Domain Tabs */}
+        <div className="flex gap-1.5 flex-wrap items-center">
+          <span className="text-[11px] text-slate-500 mr-1 font-semibold uppercase tracking-wider">
+            Domain:
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedDomain('ALL')}
+            className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
+              selectedDomain === 'ALL'
+                ? 'bg-primary text-white shadow-xs'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            All Domains ({outcomes.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDomain('heat')}
+            className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
+              selectedDomain === 'heat'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
+            }`}
+          >
+            ☀️ Extreme Heat ({heatCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDomain('waterlogging')}
+            className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
+              selectedDomain === 'waterlogging'
+                ? 'bg-cyan-600 text-white shadow-xs'
+                : 'bg-white text-cyan-700 border border-cyan-200 hover:bg-cyan-50'
+            }`}
+          >
+            🌊 Waterlogging ({waterloggingCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDomain('water_shortage')}
+            className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
+              selectedDomain === 'water_shortage'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'bg-white text-sky-700 border border-sky-200 hover:bg-sky-50'
+            }`}
+          >
+            💧 Water Shortage ({waterShortageCount})
+          </button>
+        </div>
+
+        {/* Ward & Search Controls */}
+        <div className="flex gap-2 items-center flex-wrap">
+          <select
+            value={selectedWard}
+            onChange={(e) => setSelectedWard(e.target.value)}
+            className="h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="ALL">All Wards</option>
+            {Array.from(new Set(outcomes.map(o => o.ward_id))).sort().map(w => (
+              <option key={w} value={w}>{w}</option>
+            ))}
+          </select>
+
+          <input
+            type="text"
+            placeholder="Search records / ID / notes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 px-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary w-48"
+          />
+        </div>
+      </div>
+
       {/* Privacy Guarantee & Stats Bar */}
       <div className="flex justify-between items-center flex-wrap gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 mb-5">
         <div className="flex items-center gap-2.5">
@@ -110,7 +209,7 @@ export default function VerifiedOutcomesSection({ outcomes = [], wards = [], onO
 
         <div className="flex gap-3 items-center text-xs">
           <span className="text-outline">
-            Total Observations: <strong className="text-on-surface">{outcomes.length}</strong>
+            Showing <strong className="text-on-surface">{filteredOutcomes.length}</strong> of <strong className="text-on-surface">{outcomes.length}</strong>
           </span>
           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
             {realCount} Empirical Real
@@ -135,7 +234,21 @@ export default function VerifiedOutcomesSection({ outcomes = [], wards = [], onO
             onClick={() => setShowAddModal(true)} 
             className="h-8 px-3.5 bg-primary text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 hover:bg-[#1B5742] shadow-xs transition-all cursor-pointer"
           >
-            <PlusCircle size={14} /> Submit First Municipal Observation
+            Log Municipal Outcome
+          </button>
+        </div>
+      ) : filteredOutcomes.length === 0 ? (
+        <div className="min-h-[200px] flex flex-col items-center justify-center p-8 bg-slate-50 border border-slate-200 rounded-xl text-center">
+          <Database className="w-10 h-10 text-slate-400 mb-2" />
+          <h4 className="text-sm font-bold text-on-surface mb-1">No Verified Outcomes Matching Filter</h4>
+          <p className="max-w-md text-xs text-on-surface-variant mb-3">
+            No records matched the selected domain ({selectedDomain}) or ward criteria.
+          </p>
+          <button 
+            onClick={() => { setSelectedDomain('ALL'); setSelectedWard('ALL'); setSearchQuery(''); }} 
+            className="h-8 px-3.5 bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold hover:bg-slate-300 transition-all cursor-pointer"
+          >
+            Reset Filters
           </button>
         </div>
       ) : (
@@ -152,7 +265,7 @@ export default function VerifiedOutcomesSection({ outcomes = [], wards = [], onO
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {outcomes.map(o => (
+              {filteredOutcomes.map(o => (
                 <tr key={o.outcome_id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3 px-3.5 font-mono text-xs font-bold text-primary">
                     {o.outcome_id}
@@ -166,8 +279,16 @@ export default function VerifiedOutcomesSection({ outcomes = [], wards = [], onO
                       Window: {o.measurement_window_hours || 24}h
                     </span>
                   </td>
-                  <td className="py-3 px-3.5 capitalize text-on-surface-variant font-medium">
-                    {o.hazard_type}
+                  <td className="py-3 px-3.5">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                      o.hazard_type === 'waterlogging'
+                        ? 'bg-cyan-50 text-cyan-800 border-cyan-200'
+                        : o.hazard_type === 'water_shortage'
+                        ? 'bg-sky-50 text-sky-800 border-sky-200'
+                        : 'bg-rose-50 text-rose-800 border-rose-200'
+                    }`}>
+                      {o.hazard_type === 'waterlogging' ? '🌊 Waterlogging' : o.hazard_type === 'water_shortage' ? '💧 Water Shortage' : '☀️ Heat'}
+                    </span>
                   </td>
                   <td className="py-3 px-3.5">
                     <div className="flex flex-col gap-1 text-xs">
