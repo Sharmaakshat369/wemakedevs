@@ -2,7 +2,9 @@
  * ClimateShield API Client - Learning Loop & Municipal Decision Engine
  */
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api` 
+  : '/api';
 
 async function handleResponse(res) {
   if (!res.ok) {
